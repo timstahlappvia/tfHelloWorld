@@ -43,14 +43,15 @@ resource "azurerm_subnet" "internal" {
 }
 
 resource "azurerm_kubernetes_cluster" "cluster1" {
-  name                = "tstahl-k8s-cluster1"
-  location            = azurerm_resource_group.rg.location
-  resource_group_name = azurerm_resource_group.rg.name
-  dns_prefix          = "tstahl-k8s-cluster1"
+  name                             = "tstahl-k8s-cluster1"
+  location                         = azurerm_resource_group.rg.location
+  resource_group_name              = azurerm_resource_group.rg.name
+  dns_prefix                       = "tstahl-k8s-cluster1"
+  http_application_routing_enabled = true
 
   default_node_pool {
-    name           = "system"
-    node_count     = 2
+    name           = "tstahlnode"
+    node_count     = 3
     vm_size        = "Standard_B2s"
     vnet_subnet_id = azurerm_subnet.internal.id
   }

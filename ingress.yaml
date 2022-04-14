@@ -1,0 +1,17 @@
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: hello-kubernetes
+  annotations:
+    kubernetes.io/ingress.class: http-application-routing
+spec:
+  backend:
+    serviceName: hello-kubernetes
+    servicePort: 80
+  rules:
+    - http:
+        paths:
+          - path: /
+            backend:
+              serviceName: hello-kubernetes
+              servicePort: 80
