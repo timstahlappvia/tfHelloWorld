@@ -47,7 +47,6 @@ resource "azurerm_kubernetes_cluster" "cluster1" {
   location                         = azurerm_resource_group.rg.location
   resource_group_name              = azurerm_resource_group.rg.name
   dns_prefix                       = "tstahl-k8s-cluster1"
-  http_application_routing_enabled = true
 
   default_node_pool {
     name           = "tstahlnode"
