@@ -22,6 +22,7 @@ resource "azurerm_resource_group" "rg" {
   }
 }
 
+# Service Principal for the K8s cluster.
 resource "azurerm_user_assigned_identity" "aksmi" {
   resource_group_name = azurerm_resource_group.rg.name
   location            = azurerm_resource_group.rg.location
@@ -79,6 +80,7 @@ data "azurerm_subscription" "sub" {
 
 }
 
+# Give the Service Principal access to the ACR.
 resource "azurerm_role_assignment" "ra" {
   principal_id                     = azurerm_user_assigned_identity.aksmi.principal_id
   role_definition_name             = "AcrPull"
