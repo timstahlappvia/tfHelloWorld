@@ -51,7 +51,7 @@ resource "azurerm_subnet" "internal" {
 }
 
 resource "azurerm_container_registry" "acr" {
-  name                = "tstahlACR1"
+  name                = "tstahlacr1"
   resource_group_name = azurerm_resource_group.rg.name
   location            = azurerm_resource_group.rg.location
   sku                 = "Basic"
@@ -76,15 +76,11 @@ resource "azurerm_kubernetes_cluster" "cluster1" {
   }
 }
 
-data "azurerm_subscription" "sub" {
-
-}
-
 # Give the Service Principal access to the ACR.
 resource "azurerm_role_assignment" "ra" {
-  principal_id                     = azurerm_user_assigned_identity.aksmi.principal_id
+  principal_id                     = azurerm_kubernetes_cluster.cluster1.kubelet_identity[0].object_id
   role_definition_name             = "AcrPull"
-  scope                            = data.azurerm_subscription.sub.id
+  scope                            = azurerm_container_registry.acr.id
   skip_service_principal_aad_check = true
 
   depends_on = [azurerm_kubernetes_cluster.cluster1]
