@@ -22,6 +22,13 @@ resource "azurerm_resource_group" "rg" {
   }
 }
 
+resource "azurerm_user_assigned_identity" "aksmi" {
+  resource_group_name = azurerm_resource_group.rg.name
+  location            = azurerm_resource_group.rg.location
+  name                = "tstahlaksmi"
+  depends_on          = [azurerm_resource_group.rg]
+}
+
 resource "azurerm_virtual_network" "k8s-vnet" {
   name                = "tstahl-network"
   location            = azurerm_resource_group.rg.location
@@ -42,11 +49,18 @@ resource "azurerm_subnet" "internal" {
 
 }
 
+resource "azurerm_container_registry" "acr" {
+  name                = "tstahlACR1"
+  resource_group_name = azurerm_resource_group.rg.name
+  location            = azurerm_resource_group.rg.location
+  sku                 = "Basic"
+}
+
 resource "azurerm_kubernetes_cluster" "cluster1" {
-  name                             = "tstahl-k8s-cluster1"
-  location                         = azurerm_resource_group.rg.location
-  resource_group_name              = azurerm_resource_group.rg.name
-  dns_prefix                       = "tstahl-k8s-cluster1"
+  name                = "tstahl-k8s-cluster1"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+  dns_prefix          = "tstahl-k8s-cluster1"
 
   default_node_pool {
     name           = "tstahlnode"
@@ -56,6 +70,20 @@ resource "azurerm_kubernetes_cluster" "cluster1" {
   }
 
   identity {
-    type = "SystemAssigned"
+    type         = "UserAssigned"
+    identity_ids = [azurerm_user_assigned_identity.aksmi.id]
   }
+}
+
+data "azurerm_subscription" "sub" {
+
+}
+
+resource "azurerm_role_assignment" "ra" {
+  principal_id                     = azurerm_user_assigned_identity.aksmi.principal_id
+  role_definition_name             = "AcrPull"
+  scope                            = data.azurerm_subscription.sub.id
+  skip_service_principal_aad_check = true
+
+  depends_on = [azurerm_kubernetes_cluster.cluster1]
 }
