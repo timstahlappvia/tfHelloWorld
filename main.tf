@@ -9,7 +9,11 @@ terraform {
 }
 
 provider "azurerm" {
-  features {}
+  features {
+    resource_group {
+      prevent_deletion_if_contains_resources = false
+    }
+  }
 }
 
 resource "azurerm_resource_group" "rg" {
@@ -85,3 +89,4 @@ resource "azurerm_role_assignment" "ra" {
 
   depends_on = [azurerm_kubernetes_cluster.cluster1]
 }
+
