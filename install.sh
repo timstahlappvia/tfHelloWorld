@@ -1,6 +1,6 @@
 #!/bin/zsh
 # Script written to set up the entire k8s project.
-terraform apply
+terraform apply -auto-approve
 echo Setting up Azure Container Registry ...
 source ./helm/setupACR.sh
 echo Setting up nginx-ingress
