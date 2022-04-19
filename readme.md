@@ -11,10 +11,11 @@ export ARM_SUBSCRIPTION_ID="xxxx"
 export ARM_TENANT_ID="xxxx"
 
 az login
+az account set -s "xxxx"
 ```
 
 ## Usage
 
 Run install.sh
 
-When complete, an application will be available at tstahltest.eastus.cloudapp.azure.com
+When complete, an application will be available at https://tstahltest.eastus.cloudapp.azure.com

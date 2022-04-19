@@ -21,7 +21,7 @@ echo nginx-Ingress Public IP is : $EXTERNAL_IP
 sleep 5
 source ./helm/setupDNS.sh
 
-read -s -k "DNS Complete -- Press any key to continue."
+read -s -k "?DNS Complete -- Press any key to continue."
 # Setup the Cert Manager
 sleep 10
 echo Setting up Certificate Manager ...
