@@ -4,6 +4,10 @@ terraform {
       source  = "hashicorp/azurerm"
       version = "~> 3.0.2"
     }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "~> 2.9.0"
+    }
   }
   required_version = ">= 1.1.0"
 }
@@ -14,6 +18,10 @@ provider "azurerm" {
       prevent_deletion_if_contains_resources = false
     }
   }
+}
+
+provider "kubernetes" {
+  config_path = "kubeconfig"
 }
 
 resource "azurerm_resource_group" "rg" {
@@ -90,3 +98,52 @@ resource "azurerm_role_assignment" "ra" {
   depends_on = [azurerm_kubernetes_cluster.cluster1]
 }
 
+resource "kubernetes_deployment" "deployment" {
+  metadata {
+    name = "hello-k8s"
+    labels = {
+      app = "HelloWorld"
+    }
+  }
+
+  spec {
+    replicas = 3
+    selector {
+      match_labels = {
+        app = "HelloWorld"
+      }
+    }
+    template {
+      metadata {
+        labels = {
+          app = "HelloWorld"
+        }
+      }
+      spec {
+        container {
+          image = "paulbouwer/hello-kubernetes:1.5"
+          name  = "example"
+          port {
+            container_port = 8080
+          }
+        }
+      }
+    }
+  }
+}
+
+resource "kubernetes_service" "HWService" {
+  metadata {
+    name = "hw-service"
+  }
+  spec {
+    selector = {
+      app = "HelloWorld"
+    }
+    port {
+      port        = 80
+      target_port = 8080
+    }
+    type = "ClusterIP"
+  }
+}
