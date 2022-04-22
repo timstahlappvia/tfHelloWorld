@@ -8,6 +8,10 @@ terraform {
       source  = "hashicorp/kubernetes"
       version = "~> 2.9.0"
     }
+    helm = {
+      source  = "hashicorp/helm"
+      version = "~> 2.5.1"
+    }
   }
   required_version = ">= 1.1.0"
 }
@@ -21,7 +25,19 @@ provider "azurerm" {
 }
 
 provider "kubernetes" {
-  config_path = "kubeconfig"
+  host                   = azurerm_kubernetes_cluster.cluster1.kube_config.0.host
+  client_key             = base64decode(azurerm_kubernetes_cluster.cluster1.kube_config.0.client_key)
+  client_certificate     = base64decode(azurerm_kubernetes_cluster.cluster1.kube_config.0.client_certificate)
+  cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.cluster1.kube_config.0.cluster_ca_certificate)
+}
+
+provider "helm" {
+  kubernetes {
+    host                   = azurerm_kubernetes_cluster.cluster1.kube_config.0.host
+    client_key             = base64decode(azurerm_kubernetes_cluster.cluster1.kube_config.0.client_key)
+    client_certificate     = base64decode(azurerm_kubernetes_cluster.cluster1.kube_config.0.client_certificate)
+    cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.cluster1.kube_config.0.cluster_ca_certificate)
+  }
 }
 
 resource "azurerm_resource_group" "rg" {
@@ -98,6 +114,78 @@ resource "azurerm_role_assignment" "ra" {
   depends_on = [azurerm_kubernetes_cluster.cluster1]
 }
 
+resource "kubernetes_namespace" "labelns" {
+  metadata {
+    annotations = {
+      name = "ingress-basic"
+    }
+    labels = {
+      "certmanager.io/disable-validation" = "true"
+    }
+    name = "ingress-basic"
+  }
+  depends_on = [azurerm_kubernetes_cluster.cluster1]
+}
+
+# Setup the Static IP for the ingress.
+resource "azurerm_public_ip" "externalip" {
+  name = "nginxIngressExternalIP1"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+  allocation_method = "Static"
+  tags = {
+    createdfor = "tstahl test env"
+  }
+}
+
+# Deploy the nginx Ingress Helm Chart
+resource "helm_release" "nginx_ingress" {
+  name       = "nginx-ingress-controller"
+  repository = "https://kubernetes.github.io/ingress-nginx"
+  chart      = "ingress-nginx"
+  namespace  = "ingress-basic"
+
+  set {
+    name  = "controller.replicaCount"
+    value = "2"
+  }
+
+  set {
+    name = "controller.service.externalIPs"
+    value = "{${azurerm_public_ip.externalip.ip_address}}"
+  }
+  
+  set {
+    name  = "controller.admissionWebhooks.patch.image.image"
+    value = "ingress-nginx/kube-webhook-certgen"
+  }
+
+  depends_on = [kubernetes_namespace.labelns, azurerm_public_ip.externalip]
+}
+
+# Deploy the Cert Manager
+resource "helm_release" "cert_manager" {
+  name       = "cert-manager"
+  repository = "https://charts.jetstack.io"
+  chart      = "cert-manager"
+  namespace  = "ingress-basic"
+
+  set {
+    name  = "installCRDs"
+    value = "true"
+  }
+
+  depends_on = [helm_release.nginx_ingress]
+}
+
+data "kubernetes_service" "ingress-controller" {
+  metadata {
+    name      = "nginx-ingress-controller-ingress-nginx-controller"
+    namespace = "ingress-basic"
+  }
+  depends_on = [helm_release.nginx_ingress]
+}
+
 resource "kubernetes_deployment" "deployment" {
   metadata {
     name = "hello-k8s"
@@ -129,21 +217,5 @@ resource "kubernetes_deployment" "deployment" {
         }
       }
     }
-  }
-}
-
-resource "kubernetes_service" "HWService" {
-  metadata {
-    name = "hw-service"
-  }
-  spec {
-    selector = {
-      app = "HelloWorld"
-    }
-    port {
-      port        = 80
-      target_port = 8080
-    }
-    type = "ClusterIP"
   }
 }
