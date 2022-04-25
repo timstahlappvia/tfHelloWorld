@@ -129,10 +129,12 @@ resource "kubernetes_namespace" "labelns" {
 
 # Setup the Static IP for the ingress.
 resource "azurerm_public_ip" "externalip" {
-  name = "nginxIngressExternalIP1"
+  name                = "nginxIngressExternalIP1"
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
-  allocation_method = "Static"
+  allocation_method   = "Static"
+  domain_name_label   = "tstahltest"
+  sku                 = "Standard"
   tags = {
     createdfor = "tstahl test env"
   }
@@ -151,10 +153,15 @@ resource "helm_release" "nginx_ingress" {
   }
 
   set {
-    name = "controller.service.externalIPs"
-    value = "{${azurerm_public_ip.externalip.ip_address}}"
+    name  = "controller.service.loadBalancerIP"
+    value = azurerm_public_ip.externalip.ip_address
   }
-  
+
+  set {
+    name  = "controller.service.annotations.service.beta.kubernetes.io/azure-dns-label-name"
+    value = "tstahltest"
+  }
+
   set {
     name  = "controller.admissionWebhooks.patch.image.image"
     value = "ingress-nginx/kube-webhook-certgen"
@@ -168,11 +175,15 @@ resource "helm_release" "cert_manager" {
   name       = "cert-manager"
   repository = "https://charts.jetstack.io"
   chart      = "cert-manager"
-  namespace  = "ingress-basic"
 
   set {
     name  = "installCRDs"
     value = "true"
+  }
+
+  set {
+    name  = "nodeSelector.kubernetes.io/os"
+    value = "linux"
   }
 
   depends_on = [helm_release.nginx_ingress]
@@ -190,7 +201,7 @@ resource "kubernetes_deployment" "deployment" {
   metadata {
     name = "hello-k8s"
     labels = {
-      app = "HelloWorld"
+      app = "helloworld"
     }
   }
 
@@ -198,13 +209,13 @@ resource "kubernetes_deployment" "deployment" {
     replicas = 3
     selector {
       match_labels = {
-        app = "HelloWorld"
+        app = "helloworld"
       }
     }
     template {
       metadata {
         labels = {
-          app = "HelloWorld"
+          app = "helloworld"
         }
       }
       spec {
@@ -213,6 +224,56 @@ resource "kubernetes_deployment" "deployment" {
           name  = "example"
           port {
             container_port = 8080
+          }
+        }
+      }
+    }
+  }
+}
+
+resource "kubernetes_service" "helloworldsvc" {
+  metadata {
+    name = "helloworldsvc"
+  }
+  spec {
+    selector = {
+      app = "helloworld"
+    }
+    port {
+      port        = 80
+      target_port = 8080
+    }
+    type = "ClusterIP"
+  }
+}
+
+resource "kubernetes_ingress_v1" "hellowing" {
+  metadata {
+    name = "hellowing"
+    annotations = {
+      "nginx.ingress.kubernetes.io/rewrite-target" = "/$2"
+      "nginx.ingress.kubernetes.io/use-regex"      = "true"
+      "cert-manager.io/cluster-issuer"             = "letsencrypt"
+    }
+  }
+  spec {
+    ingress_class_name = "nginx"
+    tls {
+      hosts       = ["tstahltest.eastus.cloudapp.azure.com"]
+      secret_name = "tls-secret"
+    }
+    rule {
+      host = "tstahltest.eastus.cloudapp.azure.com"
+      http {
+        path {
+          path = "/*"
+          backend {
+            service {
+              name = "helloworldsvc"
+              port {
+                number = 80
+              }
+            }
           }
         }
       }
