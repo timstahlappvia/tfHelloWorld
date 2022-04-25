@@ -3,19 +3,10 @@ This project was developed to learn k8s in Azure using Terraform/Helm and end up
 
 ## Installation
 
-Setup your Azure environment in your shell:
-```zsh
-export ARM_CLIENT_ID="xxxx"
-export ARM_CLIENT_SECRET="xxxx"
-export ARM_SUBSCRIPTION_ID="xxxx"
-export ARM_TENANT_ID="xxxx"
-
-az login
-az account set -s "xxxx"
-```
+Terraform init / terraform apply the main.tf file.
+kubectl apply -f ./k8s/cluster-issuer.yaml to create the issuer.
+Had to make that part separate due to constraints with the kubernetes_manifest resource in Terraform. The cluster must be created before planning can commence due to the requirement of TF to use the API.
 
 ## Usage
-
-Run install.sh
 
 When complete, an application will be available at https://tstahltest.eastus.cloudapp.azure.com
