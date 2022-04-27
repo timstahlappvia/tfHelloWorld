@@ -114,6 +114,16 @@ resource "azurerm_role_assignment" "ra" {
   depends_on = [azurerm_kubernetes_cluster.cluster1]
 }
 
+# Give the Service Principal Network Contributor access to the resource group -- for dynamic setting of IP on nginx-ingress-controller.
+resource "azurerm_role_assignment" "ranet" {
+  principal_id                     = azurerm_user_assigned_identity.aksmi.principal_id
+  role_definition_name             = "Network Contributor"
+  scope                            = azurerm_resource_group.rg.id
+  skip_service_principal_aad_check = true
+
+  depends_on = [azurerm_kubernetes_cluster.cluster1]
+}
+
 resource "kubernetes_namespace" "labelns" {
   metadata {
     annotations = {
@@ -158,8 +168,8 @@ resource "helm_release" "nginx_ingress" {
   }
 
   set {
-    name  = "controller.service.annotations.service.beta.kubernetes.io/azure-dns-label-name"
-    value = "tstahltest"
+    name  = "controller.service.annotations.service\\.beta\\.kubernetes\\.io/azure-load-balancer-resource-group"
+    value = azurerm_resource_group.rg.name
   }
 
   set {
@@ -167,7 +177,7 @@ resource "helm_release" "nginx_ingress" {
     value = "ingress-nginx/kube-webhook-certgen"
   }
 
-  depends_on = [kubernetes_namespace.labelns, azurerm_public_ip.externalip]
+  depends_on = [kubernetes_namespace.labelns, azurerm_public_ip.externalip, azurerm_role_assignment.ranet]
 }
 
 # Deploy the Cert Manager
@@ -179,11 +189,6 @@ resource "helm_release" "cert_manager" {
   set {
     name  = "installCRDs"
     value = "true"
-  }
-
-  set {
-    name  = "nodeSelector.kubernetes.io/os"
-    value = "linux"
   }
 
   depends_on = [helm_release.nginx_ingress]
@@ -247,12 +252,36 @@ resource "kubernetes_service" "helloworldsvc" {
   }
 }
 
+resource "helm_release" "cert_issuer" {
+  name       = "letsencrypt"
+  repository = "./modules/cert-issuer"
+  chart      = "cert-issuer"
+  namespace  = "default"
+
+  set {
+    name  = "fullnameOverride"
+    value = "Tim Stahl"
+  }
+  set {
+    name  = "ingressClass"
+    value = "nginx"
+  }
+  set {
+    name  = "acmeEmail"
+    value = "tim.stahl@appvia.io"
+  }
+  set {
+    name  = "acmeServer"
+    value = "https://acme-v02.api.letsencrypt.org/directory"
+  }
+  depends_on = [helm_release.cert_manager]
+}
+
 resource "kubernetes_ingress_v1" "hellowing" {
   metadata {
     name = "hellowing"
     annotations = {
-      "nginx.ingress.kubernetes.io/rewrite-target" = "/$2"
-      "nginx.ingress.kubernetes.io/use-regex"      = "true"
+      "nginx.ingress.kubernetes.io/rewrite-target" = "/$1"
       "cert-manager.io/cluster-issuer"             = "letsencrypt"
     }
   }
@@ -279,4 +308,5 @@ resource "kubernetes_ingress_v1" "hellowing" {
       }
     }
   }
+  depends_on = [helm_release.cert_issuer]
 }
