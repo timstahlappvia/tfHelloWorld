@@ -254,25 +254,17 @@ resource "kubernetes_service" "helloworldsvc" {
 
 resource "helm_release" "cert_issuer" {
   name       = "letsencrypt"
-  repository = "./modules/cert-issuer"
+  repository = "./modules"
   chart      = "cert-issuer"
   namespace  = "default"
 
-  set {
-    name  = "fullnameOverride"
-    value = "Tim Stahl"
-  }
-  set {
-    name  = "ingressClass"
-    value = "nginx"
-  }
   set {
     name  = "acmeEmail"
     value = "tim.stahl@appvia.io"
   }
   set {
     name  = "acmeServer"
-    value = "https://acme-v02.api.letsencrypt.org/directory"
+    value = "https://acme-staging-v02.api.letsencrypt.org/directory"
   }
   depends_on = [helm_release.cert_manager]
 }
@@ -281,7 +273,6 @@ resource "kubernetes_ingress_v1" "hellowing" {
   metadata {
     name = "hellowing"
     annotations = {
-      "nginx.ingress.kubernetes.io/rewrite-target" = "/$1"
       "cert-manager.io/cluster-issuer"             = "letsencrypt"
     }
   }
@@ -295,7 +286,8 @@ resource "kubernetes_ingress_v1" "hellowing" {
       host = "tstahltest.eastus.cloudapp.azure.com"
       http {
         path {
-          path = "/*"
+          path = "/"
+          path_type = "Prefix"
           backend {
             service {
               name = "helloworldsvc"
